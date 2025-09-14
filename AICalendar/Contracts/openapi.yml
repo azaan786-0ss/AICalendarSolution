@@ -1,0 +1,164 @@
+﻿openapi: 3.1.0
+
+info:
+  title: AICalendar API
+  version: 1.0.0
+  description: API for AI-powered calendar management
+
+servers:
+  - url: https://api.aicalendar.com/v1
+    description: Production server
+  - url: http://localhost:5000/v1
+    description: Development server
+
+paths:
+  /calendars:
+    get:
+      summary: List all calendars
+      parameters:
+        - name: timezone
+          in: query
+          description: Timezone for displaying times
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of calendars
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/$defs/Calendar'
+    post:
+      summary: Create a new calendar
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/$defs/Calendar'
+      responses:
+        '201':
+          description: Calendar created
+          content:
+            application/json:
+              schema:
+                $ref: '#/$defs/Calendar'
+
+  /events:
+    get:
+      summary: List all events
+      parameters:
+        - name: start_time
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: end_time
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: timezone
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of events
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/$defs/Event'
+
+  /attendees:
+    get:
+      summary: List all attendees
+      responses:
+        '200':
+          description: List of attendees
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/$defs/Attendee'
+
+$defs:
+  Calendar:
+    type: object
+    properties:
+      id:
+        type: string
+        format: uuid
+      name:
+        type: string
+      description:
+        type: string
+      timezone:
+        type: string
+      color:
+        type: string
+      created_at:
+        type: string
+        format: date-time
+      updated_at:
+        type: string
+        format: date-time
+    required: [name, timezone]
+
+  Event:
+    type: object
+    properties:
+      id:
+        type: string
+        format: uuid
+      calendar_id:
+        type: string
+        format: uuid
+      title:
+        type: string
+      description:
+        type: string
+      start_time:
+        type: string
+        format: date-time
+      end_time:
+        type: string
+        format: date-time
+      timezone:
+        type: string
+      location:
+        type: string
+      created_at:
+        type: string
+        format: date-time
+      updated_at:
+        type: string
+        format: date-time
+    required: [calendar_id, title, start_time, end_time, timezone]
+
+  Attendee:
+    type: object
+    properties:
+      id:
+        type: string
+        format: uuid
+      event_id:
+        type: string
+        format: uuid
+      email:
+        type: string
+        format: email
+      name:
+        type: string
+      status:
+        type: string
+        enum: [PENDING, ACCEPTED, DECLINED, TENTATIVE]
+      created_at:
+        type: string
+        format: date-time
+    required: [event_id, email]
