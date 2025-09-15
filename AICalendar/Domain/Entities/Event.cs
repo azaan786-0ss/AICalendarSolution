@@ -1,4 +1,4 @@
-﻿namespace AICalendar.Domain.Entities
+﻿    namespace AICalendar.Domain.Entities
 {
     public class Event
     {
@@ -10,5 +10,10 @@
         public Calendar Calendar { get; set; } = null!;
         public ICollection<Attendee> Attendees { get; set; } = new List<Attendee>();
         public ICollection<Reminder> Reminders { get; set; } = new List<Reminder>();
+        public string ClientReferenceId { get; set; }
+        public string Timezone { get; set; }
+        public string Location { get; set; }
+        public string Notes { get; set; }
+        public string AttendeesRaw { get; set; }
     }
 }

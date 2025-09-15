@@ -1,10 +1,12 @@
 ﻿using AICalendar.Data;
+using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using AspNetCoreRateLimit;
 using Microsoft.AspNetCore.Mvc;
+using OpenAI;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -58,6 +60,7 @@ builder.Services.Configure<ApiBehaviorOptions>(options =>
     };
 });
 
+
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
@@ -98,6 +101,12 @@ app.UseExceptionHandler(errorApp =>
 });
 app.MapControllers();
 app.Run();
+
+
+
+
+
+
 
 
 
