@@ -4,6 +4,9 @@ using System.Threading.Tasks;
 using AICalendar.API.Services;
 using AICalendar.Data;
 using AICalendar.Domain.Entities;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
 [ApiController]
 [Route("api/mcp-gateway")]
@@ -12,15 +15,21 @@ public class McpGatewayController : ControllerBase
     private readonly IntentClassificationService _intentService;
     private readonly IChatCompletionService _chatService;
     private readonly AppDbContext _db;
+    private readonly ILogger<McpGatewayController> _logger;
+    private readonly bool _redactTitle;
 
     public McpGatewayController(
         IntentClassificationService intentService,
         IChatCompletionService chatService,
-        AppDbContext db)
+        AppDbContext db,
+        ILogger<McpGatewayController> logger,
+        IConfiguration config)
     {
         _intentService = intentService;
         _chatService = chatService;
         _db = db;
+        _logger = logger;
+        _redactTitle = config.GetValue<bool>("RedactTitle");
     }
 
     [HttpPost("route")]
@@ -32,6 +41,9 @@ public class McpGatewayController : ControllerBase
 
         // 1. Classify intent using LLM
         var intent = await _intentService.ClassifyIntentAsync(userInput, _chatService);
+
+        // Log LLM output
+        _logger.LogInformation("LLM output: {Intent}", intent);
 
         // 2. Route to MCP tool based on intent
         switch (intent)
@@ -54,8 +66,20 @@ public class McpGatewayController : ControllerBase
     {
         var clientRefId = payload["client_reference_id"]?.ToString();
         var title = payload["title"]?.ToString()?.Trim();
-        var start = DateTime.Parse(payload["start"]?.ToString() ?? "");
-        var end = DateTime.Parse(payload["end"]?.ToString() ?? "");
+        var startStr = payload["start"]?.ToString();
+        var endStr = payload["end"]?.ToString();
+
+        var missingFields = new List<string>();
+        if (string.IsNullOrWhiteSpace(clientRefId)) missingFields.Add("client_reference_id");
+        if (string.IsNullOrWhiteSpace(title)) missingFields.Add("title");
+        if (string.IsNullOrWhiteSpace(startStr)) missingFields.Add("start");
+        if (string.IsNullOrWhiteSpace(endStr)) missingFields.Add("end");
+
+        if (missingFields.Count > 0)
+            return BadRequest(new { ok = false, error = "missing_fields", fields = missingFields });
+
+        var start = DateTime.Parse(startStr);
+        var end = DateTime.Parse(endStr);
         var timezone = payload["timezone"]?.ToString();
         var location = payload["location"]?.ToString();
         var attendees = payload["attendees"]?.ToString();
@@ -93,6 +117,13 @@ public class McpGatewayController : ControllerBase
             };
             _db.Events.Add(newEvent);
             await _db.SaveChangesAsync();
+
+            // Log MCP call
+            _logger.LogInformation("MCP call: {Method}", "create");
+
+            // Log DB id and title (sensitive data redaction)
+            _logger.LogInformation("DB id: {Id}, title: {Title}", newEvent.Id, _redactTitle ? "[REDACTED]" : newEvent.Title);
+
             return Ok(new
             {
                 ok = true,
@@ -116,7 +147,17 @@ public class McpGatewayController : ControllerBase
         if (payload.ContainsKey("end")) existing.EndTime = DateTime.Parse(payload["end"]?.ToString() ?? "");
         if (payload.ContainsKey("timezone")) existing.Timezone = payload["timezone"]?.ToString();
         if (payload.ContainsKey("location")) existing.Location = payload["location"]?.ToString();
-        if (payload.ContainsKey("attendees")) existing.Attendees = payload["attendees"]?.ToString();
+        if (payload.ContainsKey("attendees") && payload["attendees"] is JsonArray attendeesArray)
+        {
+            existing.Attendees = attendeesArray
+                .Select(a => new Attendee
+                {
+                    Name = a?["name"]?.ToString(),
+                    Email = a?["email"]?.ToString(),
+                    Status = a?["status"]?.ToString()
+                })
+                .ToList();
+        }
         if (payload.ContainsKey("notes")) existing.Notes = payload["notes"]?.ToString();
 
         await _db.SaveChangesAsync();
